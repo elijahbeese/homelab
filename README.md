@@ -119,6 +119,7 @@ This lab exists to build hands-on experience with:
 
 - B.S. Cybersecurity (graduating May 2026)
 - CompTIA Security+
+- ISC2 Certified in Cybersecurity
 - Microsoft AZ-900
 
 ---
