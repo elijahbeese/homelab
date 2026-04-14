@@ -1,5 +1,3 @@
-<div align="center">
-
 ```text
 ██╗      █████╗ ██████╗     ███████╗███████╗ ██████╗
 ██║     ██╔══██╗██╔══██╗    ██╔════╝██╔════╝██╔════╝
@@ -20,8 +18,6 @@
 
 *A hands-on enterprise-grade security lab built from commodity hardware.*  
 *Real attacks. Real detections. Real skill.*
-
-</div>
 
 ---
 
@@ -358,10 +354,6 @@ Pipeline: Universal Forwarder → Splunk Enterprise → indexed
 
 ---
 
-<div align="center">
-
 **B.S. Cybersecurity** *(in progress)* · **CompTIA Security+** · **Microsoft AZ-900**
 
 *Certs teach you concepts. Labs teach you how things actually break.*
-
-</div>
