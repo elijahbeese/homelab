@@ -1,13 +1,13 @@
 <div align="center">
 
-```
+```text
 ██╗      █████╗ ██████╗     ███████╗███████╗ ██████╗
 ██║     ██╔══██╗██╔══██╗    ██╔════╝██╔════╝██╔════╝
 ██║     ███████║██████╔╝    ███████╗█████╗  ██║
 ██║     ██╔══██║██╔══██╗    ╚════██║██╔══╝  ██║
 ███████╗██║  ██║██████╔╝    ███████║███████╗╚██████╗
 ╚══════╝╚═╝  ╚═╝╚═════╝     ╚══════╝╚══════╝ ╚═════╝
-```
+```text
 
 **Attack. Detect. Defend. Repeat.**
 
@@ -48,7 +48,7 @@ Built on a mix of repurposed enterprise hardware and consumer gear — because t
 
 ## 🌐 Network Architecture
 
-```
+```text
                         INTERNET
                             │
               Apartment Router (172.20.x.x)
@@ -90,7 +90,7 @@ Built on a mix of repurposed enterprise hardware and consumer gear — because t
   splunk        100.81.37.2
   raspberrypi   100.119.34.79
   proliant      100.119.210.126
-```
+```text
 
 ---
 
@@ -184,7 +184,7 @@ ssh proliant    # Iowa ProLiant
 ssh pi          # Raspberry Pi 5
 ssh kali        # Kali attack VM
 ssh splunk      # Splunk SIEM VM
-```
+```text
 
 All connections route over Tailscale. Passwordless via ED25519 key auth.
 
@@ -205,7 +205,7 @@ Prefix key: `Ctrl+a`
 ```bash
 tmuxinator start lab    # Launch full lab layout
                         # windows: local · proxmox · pi · logs
-```
+```text
 
 ---
 
@@ -221,7 +221,7 @@ show options
 set RHOSTS <target>
 set LHOST <your IP>
 run
-```
+```text
 
 ---
 
@@ -240,7 +240,7 @@ hydra -l admin -P ~/tools/SecLists/Passwords/Common-Credentials/10k-most-common.
 
 # Web scanning
 nikto -h http://target
-```
+```text
 
 ---
 
@@ -255,7 +255,7 @@ ansible all -i ~/lab/ansible/inventory -a "uptime"
 
 # Run on specific group
 ansible proxmox -i ~/lab/ansible/inventory -a "df -h"
-```
+```text
 
 Node groups: `proxmox` · `pi` · `proliant` · `lab` (all)
 
@@ -267,7 +267,7 @@ Node groups: `proxmox` · `pi` · `proliant` · `lab` (all)
 sudo systemctl status SplunkForwarder
 sudo /opt/splunkforwarder/bin/splunk add monitor /path/to/logs
 sudo /opt/splunkforwarder/bin/splunk list forward-server
-```
+```text
 
 Pipeline: `ProBook /var/log → UF → Splunk:9997 → indexed`
 
@@ -277,7 +277,7 @@ Pipeline: `ProBook /var/log → UF → Splunk:9997 → indexed`
 
 ```bash
 ~/lab/push-keys.sh
-```
+```text
 
 Pushes your public key to all configured lab nodes in one shot.
 
@@ -285,13 +285,13 @@ Pushes your public key to all configured lab nodes in one shot.
 
 ## 📊 Current Telemetry
 
-```
+```text
 index=* host=kali     → 41,949 events
 index=* host=fedora   → queued (Splunk offline)
 
 Sources: auth · syslog · dpkg · apt · lightdm
 Pipeline: Universal Forwarder → Splunk Enterprise → indexed
-```
+```text
 
 ---
 
