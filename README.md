@@ -1,3 +1,5 @@
+<div align="center">
+
 ```
 ██╗      █████╗ ██████╗     ███████╗███████╗ ██████╗
 ██║     ██╔══██╗██╔══██╗    ██╔════╝██╔════╝██╔════╝
@@ -7,101 +9,130 @@
 ╚══════╝╚═╝  ╚═╝╚═════╝     ╚══════╝╚══════╝ ╚═════╝
 ```
 
-![Status](https://img.shields.io/badge/status-active-00ff88?style=for-the-badge&labelColor=0d1117)
-![Splunk](https://img.shields.io/badge/Splunk-10.2.1-ff6b35?style=for-the-badge&labelColor=0d1117)
-![Proxmox](https://img.shields.io/badge/Proxmox-9.1-e57000?style=for-the-badge&labelColor=0d1117)
-![Tailscale](https://img.shields.io/badge/Tailscale-connected-4a9eff?style=for-the-badge&labelColor=0d1117)
-![Fedora](https://img.shields.io/badge/Fedora-43-51a2da?style=for-the-badge&labelColor=0d1117)
+**Attack. Detect. Defend. Repeat.**
 
-**A hands-on enterprise-grade security lab built from commodity hardware.**  
-Attack. Detect. Defend. Repeat.
+![Status](https://img.shields.io/badge/STATUS-ACTIVE-00ff88?style=for-the-badge&labelColor=0a0a0a&color=00ff88)
+![Proxmox](https://img.shields.io/badge/PROXMOX-9.1-e57000?style=for-the-badge&labelColor=0a0a0a)
+![Splunk](https://img.shields.io/badge/SPLUNK-10.2.1-ff6b35?style=for-the-badge&labelColor=0a0a0a)
+![Fedora](https://img.shields.io/badge/FEDORA-43-51a2da?style=for-the-badge&labelColor=0a0a0a)
+![Tailscale](https://img.shields.io/badge/TAILSCALE-MESH-4a9eff?style=for-the-badge&labelColor=0a0a0a)
+![Wazuh](https://img.shields.io/badge/WAZUH-IN_PROGRESS-ffcc00?style=for-the-badge&labelColor=0a0a0a)
+
+*A hands-on enterprise-grade security lab built from commodity hardware.*  
+*Real attacks. Real detections. Real skill.*
+
+</div>
 
 ---
 
-## Hardware
+## ⚡ What This Is
+
+This is not a homelab for running Plex. This is a full-spectrum offensive and defensive security environment built to simulate enterprise attack scenarios, develop real detection engineering skills, and prepare for a career in cybersecurity. Every component was chosen, configured, and broken at least twice.
+
+Built on a mix of repurposed enterprise hardware and consumer gear — because that's what real labs look like.
+
+---
+
+## 🖥️ Hardware
 
 | Device | Specs | Role |
 |---|---|---|
-| Dell OptiPlex 7010 | i5-3570 @ 3.4GHz · 15.5GB RAM · HDD | Primary hypervisor |
-| HP ProLiant DL360 G7 | 2x X5650 Xeon · 32GB RAM · 4x SAS | Remote lab node (Iowa) |
-| HP ProBook 650 G8 | i5-11th Gen · 16GB RAM · 475GB NVMe | Dedicated lab terminal |
-| Raspberry Pi 5 | 8GB RAM · Vilros kit | DNS + network monitoring |
-| TP-Link TL-SG108E | 8-port managed | Lab switching |
-| MacBook Air M2 | macOS 13.5 | Management workstation |
+| **Dell OptiPlex 7010** | i5-3570 · 15.5GB RAM · HDD | Primary hypervisor (Proxmox) |
+| **HP ProLiant DL360 G7** | 2× Xeon X5650 · 32GB RAM · SAS | Remote heavy-lift node (Iowa) |
+| **HP ProBook 650 G8** | i7-1165G7 · 16GB RAM · 475GB NVMe | Dedicated attack terminal (Fedora 43) |
+| **Raspberry Pi 5** | 8GB RAM | DNS sinkhole + network monitoring |
+| **TP-Link TL-SG108E** | 8-port managed switch | Lab switching |
+| **MacBook Air M2** | macOS 13.5 | Secondary management workstation |
 
 ---
 
-## Network Architecture
+## 🌐 Network Architecture
 
 ```
-Internet
-    │
-Apartment Router ── cannot access, no port forwarding
-    │
-    ├── MacBook Air (WiFi) ─────────────── 172.20.x.x
-    ├── HP ProBook 650 G8 (WiFi) ────────── 100.74.18.2 (Tailscale)
-    └── Dell OptiPlex (Ethernet) ────────── 172.20.16.175
-              │
+                        INTERNET
+                            │
+              Apartment Router (172.20.x.x)
+              ⚠️  No port forwarding — NAT blocked
+                            │
+                ┌───────────┴───────────┐
+                │                       │
+         OptiPlex (Ethernet)      ProBook (WiFi)
+         172.20.16.175            Tailscale: 100.74.18.2
+                │
          Proxmox VE 9.1.1
-              │
-    ┌─────────┼──────────┐
-    │         │          │
- OPNsense   Kali      Splunk
- 192.168.1.1  .100      .103
+                │
+     ┌──────────┼──────────┐
+     │          │          │
+  OPNsense    Kali       Splunk
+  192.168.1.1  .100       .103
+  (VM 200)   (VM 100)   (VM 101)
 
-HP ProLiant (Iowa) ──── Tailscale: 100.119.210.126
-    └── Wazuh (planned)
-    └── Active Directory lab (planned)
+  Iowa ──────────────────────────────────────
+  HP ProLiant DL360 G7
+  Tailscale: 100.119.210.126
+  └── Wazuh (deploying)
+  └── Windows Server 2022 AD (planned)
+  └── BloodHound lab (planned)
 
-Raspberry Pi 5 ─────── Tailscale: 100.119.34.79
-    └── Pi-hole (DNS)
-    └── Zeek (network monitoring)
+  Tampa ─────────────────────────────────────
+  Raspberry Pi 5
+  Tailscale: 100.119.34.79
+  └── Pi-hole DNS
+  └── Zeek 8.1.1
 
-─────────────────────────────────────────────────
-Tailscale Overlay (bypasses apartment NAT)
-─────────────────────────────────────────────────
-MacBook      100.104.62.66
-Kali         100.77.251.92
-Proxmox      100.90.195.73
-Pi           100.119.34.79
-Splunk       100.81.37.2
-ProLiant     100.119.210.126
-Fedora       100.74.18.2
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAILSCALE MESH (bypasses apartment NAT)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  fedora        100.74.18.2
+  macbook       100.104.62.66
+  kali          100.77.251.92
+  proxmox       100.90.195.73
+  splunk        100.81.37.2
+  raspberrypi   100.119.34.79
+  proliant      100.119.210.126
 ```
 
 ---
 
-## Stack
+## 🏗️ Stack
 
-### OptiPlex — Local Lab Node
+### 🔴 OptiPlex — Local Hypervisor
 
-**Proxmox VE 9.1.1** — Hypervisor running all local VMs. Kali, OPNsense, and Splunk live here.
+**Proxmox VE 9.1.1** — Bare metal hypervisor. Hosts all local VMs. Type 1 hypervisor on repurposed desktop hardware.
 
-**OPNsense** (VM 200) — Virtual firewall and router. Handles all routing, NAT, DHCP, and DNS forwarding for the `192.168.1.x` lab subnet. Unbound forwards DNS queries to Pi-hole.
+**OPNsense** `VM 200 · 192.168.1.1` — Virtual firewall and router. Full NAT, DHCP, DNS forwarding via Unbound → Pi-hole. Segments the lab subnet from the apartment network.
 
-**Kali Linux** (VM 100) — Attack platform. Runs exploits, enumeration tools, and offensive payloads against lab targets. Splunk Universal Forwarder installed and shipping 40,000+ events.
+**Kali Linux** `VM 100 · 192.168.1.100` — Primary attack platform. Full offensive toolkit. Splunk Universal Forwarder installed, shipping 40,000+ events to SIEM.
 
-**Splunk Enterprise 10.2.1** (VM 101) — SIEM. Ingesting logs from Kali via Universal Forwarder on port 9997. Next: ingest Wazuh alerts from the ProLiant.
-
----
-
-### ProLiant — Remote Heavy-Lift Node
-
-**Wazuh 4.x** *(in progress)* — Full stack: manager, indexer, dashboard. Moved here from the OptiPlex after HDD timeouts killed OpenSearch initialization repeatedly. 32GB RAM and SAS drives handle it properly.
-
-**Active Directory Lab** *(planned)* — Windows Server 2022 domain controller + domain-joined Windows 10/11 victim VMs. BloodHound enumeration, Kerberoasting, Pass-the-Hash, DCSync attacks from Kali — detection in Wazuh and Splunk.
+**Splunk Enterprise 10.2.1** `VM 101 · 192.168.1.103` — SIEM. Ingesting logs from Kali and the ProBook via Universal Forwarder on port 9997.
 
 ---
 
-### HP ProBook 650 G8 — Dedicated Lab Terminal
+### 🟠 ProLiant — Remote Heavy-Lift Node
 
-Fresh Fedora 43 install with full attack tooling, remote access, and SIEM forwarding. This is the primary workstation for operating the lab.
+Dual-socket Xeon server co-located in Iowa. Accessed exclusively via Tailscale.
 
-**OS:** Fedora 43 Workstation, LUKS full-disk encryption  
-**Shell:** zsh + Oh My Zsh + Powerlevel10k  
-**Remote access:** Tailscale (`100.74.18.2`), SSH key auth to all nodes  
+**Wazuh** *(deploying)* — Full stack HIDS: manager + OpenSearch indexer + dashboard. Previously failed on OptiPlex due to spinning HDD I/O timeouts killing OpenSearch initialization. The ProLiant's SAS drives and 32GB RAM handle it properly.
 
-#### Tools Installed
+**Windows Server 2022 AD Lab** *(planned)* — Domain controller + Windows 10/11 victim VMs. Attack scenarios:
+- BloodHound enumeration
+- Kerberoasting
+- Pass-the-Hash
+- DCSync
+- Detection in Wazuh + Splunk
+
+---
+
+### 🟡 ProBook 650 G8 — Attack Terminal
+
+Fresh Fedora 43 install. Full-disk LUKS encryption. This is the daily driver for operating the lab.
+
+**OS:** Fedora 43 · LUKS encrypted · i7-1165G7 · 16GB RAM · 475GB NVMe  
+**Shell:** zsh + Oh My Zsh + Powerlevel10k + autosuggestions + syntax highlighting  
+**Terminal multiplexer:** tmux with custom keybindings and status bar  
+**Editor:** Neovim with LSP, Treesitter, Telescope, Catppuccin  
+
+#### Attack Tooling
 
 | Tool | Purpose |
 |---|---|
@@ -109,314 +140,228 @@ Fresh Fedora 43 install with full attack tooling, remote access, and SIEM forwar
 | Burp Suite Community | Web app proxy / interceptor |
 | gobuster | Directory and DNS fuzzing |
 | ffuf | Fast web fuzzer |
-| hydra | Password brute-force |
-| nikto | Web server scanner |
-| nmap | Network/port scanning |
+| hydra | Credential brute-force |
+| nikto | Web server scanning |
+| nmap | Network reconnaissance |
 | wireshark | Packet capture and analysis |
 | tcpdump | CLI packet capture |
-| SecLists | Wordlist collection (~1GB) |
 | sqlmap | SQL injection automation |
-| ansible | Node management / automation |
+| SecLists | Wordlist collection (~1GB) |
+
+#### Infrastructure & Automation
+
+| Tool | Purpose |
+|---|---|
+| Ansible | Node management and automation |
+| Tailscale | Mesh VPN — zero config remote access |
+| Splunk UF 10.2.2 | Forwarding local logs to SIEM |
 | auditd | Local system audit logging |
 | fail2ban | Brute-force protection |
-| Splunk UF 10.2.2 | Forwarding logs to Splunk SIEM |
+| rkhunter | Rootkit scanning (498 checks, 0 found) |
+| ClamAV | Malware scanning |
+| virt-manager | Local VM management |
+| Remmina | Remote desktop client (RDP/VNC/SSH) |
+| Claude Code | AI-assisted development in terminal |
+| Obsidian | Lab notes, CTF writeups, attack playbooks |
 
 ---
 
-### Raspberry Pi 5 — Perimeter Node
+### 🟢 Raspberry Pi 5 — Perimeter Node
 
-**Pi-hole** — Network-level DNS sinkhole. All lab DNS routes through it.
+**Pi-hole** — Network DNS sinkhole. Every lab DNS query flows through it. Malware C2 beaconing shows up here before anything else catches it.
 
-**Zeek 8.1.1** — Passive network monitoring on `eth0`. Generates structured logs for connections, DNS, HTTP, SSL, and file transfers.
-
-**Tailscale** — Enrolled on all lab nodes. Bypasses apartment NAT via outbound-only connections.
+**Zeek 8.1.1** — Passive network traffic analysis on `eth0`. Structured logs for connections, DNS, HTTP, SSL, and file transfers. Deployed outside the OPNsense perimeter for an independent vantage point.
 
 ---
 
-## Tool Usage Reference
+## 🛠️ Tool Usage Reference
 
-### SSH — Connecting to Lab Nodes
-
-SSH config is set up with named hosts. From the ProBook terminal:
+### SSH — One-Command Node Access
 
 ```bash
-ssh proxmox     # Proxmox hypervisor (OptiPlex)
-ssh proliant    # ProLiant remote node (Iowa)
+ssh proxmox     # OptiPlex hypervisor
+ssh proliant    # Iowa ProLiant
 ssh pi          # Raspberry Pi 5
-ssh kali        # Kali Linux VM
-ssh splunk      # Splunk VM
+ssh kali        # Kali attack VM
+ssh splunk      # Splunk SIEM VM
 ```
 
-All connections go over Tailscale IPs. No VPN setup required, just needs Tailscale running (`tailscale status` to verify).
+All connections route over Tailscale. Passwordless via ED25519 key auth.
 
 ---
 
-### tmux — Terminal Multiplexer
+### tmux — Session Management
 
-tmux keeps sessions alive and lets you split the terminal into panes. Essential for monitoring multiple things at once.
+Prefix key: `Ctrl+a`
 
-```bash
-tmux                  # start a new session
-tmux attach           # reattach to existing session
-tmuxinator start lab  # launch full lab layout (local + proxmox + pi + logs)
-```
-
-**Key bindings** (prefix is `Ctrl+a`):
-
-| Keys | Action |
+| Binding | Action |
 |---|---|
-| `Ctrl+a \|` | Split pane vertically |
-| `Ctrl+a -` | Split pane horizontally |
-| `Ctrl+a z` | Zoom current pane fullscreen |
-| `Ctrl+a d` | Detach session (keeps it running) |
-| `Ctrl+a [0-9]` | Switch windows |
-| Click | Move between panes (mouse enabled) |
+| `Ctrl+a \|` | Split vertical |
+| `Ctrl+a -` | Split horizontal |
+| `Ctrl+a z` | Zoom pane fullscreen |
+| `Ctrl+a d` | Detach session |
+| Mouse click | Switch panes |
+
+```bash
+tmuxinator start lab    # Launch full lab layout
+                        # windows: local · proxmox · pi · logs
+```
 
 ---
 
-### Metasploit — Exploitation Framework
+### Metasploit
 
 ```bash
-msfconsole           # launch Metasploit
-```
+msfconsole
 
-Basic workflow inside msfconsole:
-
-```
-search <exploit name>          # find a module
-use <module path>              # load a module
-show options                   # see required params
-set RHOSTS <target IP>         # set target
-set LHOST <your IP>            # set listener
-run                            # execute
-```
-
-Example — run a scan:
-```
-use auxiliary/scanner/portscan/tcp
-set RHOSTS 192.168.1.0/24
+# Inside msf:
+search <module>
+use <path>
+show options
+set RHOSTS <target>
+set LHOST <your IP>
 run
 ```
 
 ---
 
-### Nmap — Network Scanning
+### Recon Workflow
 
 ```bash
-# Quick scan
-nmap 192.168.1.0/24
+# Network discovery
+nmap -sV -p- 192.168.1.0/24
 
-# Full port scan with service detection
-nmap -sV -p- 192.168.1.100
+# Web directory fuzzing
+gobuster dir -u http://target -w ~/tools/SecLists/Discovery/Web-Content/common.txt
+ffuf -u http://target/FUZZ -w ~/tools/SecLists/Discovery/Web-Content/common.txt -fc 404
 
-# OS detection + scripts
-nmap -A 192.168.1.100
+# Credential attacks
+hydra -l admin -P ~/tools/SecLists/Passwords/Common-Credentials/10k-most-common.txt ssh://target
 
-# Scan through Tailscale
-nmap 100.90.195.73
+# Web scanning
+nikto -h http://target
 ```
 
 ---
 
-### Gobuster — Directory Fuzzing
-
-```bash
-# Directory brute force
-gobuster dir -u http://target.com -w ~/tools/SecLists/Discovery/Web-Content/common.txt
-
-# DNS subdomain enumeration
-gobuster dns -d target.com -w ~/tools/SecLists/Discovery/DNS/subdomains-top1million-5000.txt
-```
-
----
-
-### ffuf — Fast Web Fuzzer
-
-```bash
-# Directory fuzzing
-ffuf -u http://target.com/FUZZ -w ~/tools/SecLists/Discovery/Web-Content/common.txt
-
-# Parameter fuzzing
-ffuf -u http://target.com/page?param=FUZZ -w ~/tools/SecLists/Fuzzing/special-chars.txt
-
-# Filter by status code
-ffuf -u http://target.com/FUZZ -w wordlist.txt -fc 404
-```
-
----
-
-### Hydra — Password Brute Force
-
-```bash
-# SSH brute force
-hydra -l admin -P ~/tools/SecLists/Passwords/Common-Credentials/10k-most-common.txt ssh://192.168.1.100
-
-# HTTP login form
-hydra -l admin -P passwords.txt 192.168.1.100 http-post-form "/login:user=^USER^&pass=^PASS^:Invalid"
-
-# FTP
-hydra -l admin -P passwords.txt ftp://192.168.1.100
-```
-
----
-
-### Nikto — Web Server Scanner
-
-```bash
-# Basic scan
-nikto -h http://192.168.1.100
-
-# Scan specific port
-nikto -h http://192.168.1.100 -p 8080
-
-# Output to file
-nikto -h http://192.168.1.100 -o scan_results.txt
-```
-
----
-
-### Ansible — Node Management
-
-Inventory lives at `~/lab/ansible/inventory`. Manage all lab nodes from one place.
+### Ansible — Lab Automation
 
 ```bash
 # Ping all nodes
 ansible all -i ~/lab/ansible/inventory -m ping --private-key ~/.ssh/id_ed25519
 
-# Run a command on all nodes
-ansible all -i ~/lab/ansible/inventory -a "uptime" --private-key ~/.ssh/id_ed25519
+# Run command on all nodes
+ansible all -i ~/lab/ansible/inventory -a "uptime"
 
-# Run on a specific group
-ansible proxmox -i ~/lab/ansible/inventory -a "df -h" --private-key ~/.ssh/id_ed25519
-
-# Run a playbook
-ansible-playbook -i ~/lab/ansible/inventory ~/lab/ansible/ping.yml
+# Run on specific group
+ansible proxmox -i ~/lab/ansible/inventory -a "df -h"
 ```
 
-Node groups: `proxmox`, `pi`, `proliant`, `lab` (all of them)
+Node groups: `proxmox` · `pi` · `proliant` · `lab` (all)
 
 ---
 
-### Splunk Universal Forwarder — Log Shipping
-
-The ProBook ships its `/var/log` to Splunk at `100.81.37.2:9997`. The forwarder runs as a systemd service.
+### Splunk Forwarder
 
 ```bash
-# Check status
 sudo systemctl status SplunkForwarder
-
-# Restart
-sudo systemctl restart SplunkForwarder
-
-# Add a new log source
 sudo /opt/splunkforwarder/bin/splunk add monitor /path/to/logs
-
-# View forwarding config
 sudo /opt/splunkforwarder/bin/splunk list forward-server
 ```
+
+Pipeline: `ProBook /var/log → UF → Splunk:9997 → indexed`
 
 ---
 
 ### Push SSH Keys to New Nodes
 
-When spinning up a new VM or node:
-
 ```bash
 ~/lab/push-keys.sh
 ```
 
-This pushes your public key to all configured lab nodes in one shot. Edit the script to add new hosts.
+Pushes your public key to all configured lab nodes in one shot.
 
 ---
 
-### Neovim
-
-```bash
-nvim <file>     # open a file
-nvim .          # open directory browser
-```
-
-Key plugins installed: Telescope (fuzzy file finder), NERDTree (file tree), vim-airline (status bar), Treesitter (syntax), LSP (language server).
+## 📊 Current Telemetry
 
 ```
-:NERDTree           # open file tree
-:Telescope find_files  # fuzzy find files
-:PlugUpdate         # update plugins
+index=* host=kali     → 41,949 events
+index=* host=fedora   → queued (Splunk offline)
+
+Sources: auth · syslog · dpkg · apt · lightdm
+Pipeline: Universal Forwarder → Splunk Enterprise → indexed
 ```
 
 ---
 
-## What's Running
+## 💀 Lessons Learned (The Hard Way)
 
-```
-elijah@splunk:~$ splunk search "index=* host=kali" | stats count
-41,949 events indexed from Kali Linux
-Sources: /var/log/* (dpkg, auth, syslog, lightdm, apt)
-Pipeline: Kali → Universal Forwarder → Splunk:9997 → indexed
+**Spinning HDDs will kill OpenSearch.** The Wazuh installer has hardcoded initialization timeouts. On a spinning disk, OpenSearch never becomes healthy in time. Eight documented failure modes before accepting this. SSD is a non-negotiable prerequisite.
 
-Fedora ProBook → Universal Forwarder → Splunk:9997 → queued (Splunk offline)
-```
+**Memory ballooning starves Java workloads.** Proxmox's balloon driver dynamically restricts VM RAM. OpenSearch and Splunk need their full allocation at startup — disable ballooning or watch them OOM silently.
 
----
+**Apartment NAT kills WireGuard.** Inbound UDP is blocked at the upstream router. Tailscale punches through via outbound-only connections. Use it from day one — don't waste time on WireGuard in a NAT'd environment.
 
-## Lessons Learned (the hard way)
+**OPNsense and pfSense dropped ARM64.** The Pi can't run either. Run the firewall as a Proxmox VM instead — better performance, easier snapshots, correct architecture.
 
-**Memory ballooning will starve your VMs.** Proxmox's balloon driver dynamically restricts RAM. OpenSearch, Splunk, and any Java-based workload needs full allocation at startup — disable ballooning.
+**You can't configure a live USB.** Fedora's live environment is a RAM-based OS. Nothing persists on reboot. Install to disk before touching anything.
 
-**HDDs and OpenSearch don't mix.** First-time index initialization on a spinning disk is too slow. The Wazuh installer's hardcoded timeout fires before OpenSearch becomes healthy. SSD or bust.
+**Wildcard installs will bite you.** A failed `curl` that saves an XML error page as `.rpm` will silently break `rpm -i *.rpm`. Always verify what's in the directory before installing.
 
-**OPNsense and pfSense dropped ARM64.** The Pi cannot run either. Hypervisor VM is the correct approach for the firewall role.
+**Never type passwords into a chat window.** Just don't.
 
-**Apartment NAT kills WireGuard.** Inbound UDP is blocked at the upstream router. Tailscale uses outbound-only connections and punches through NAT without port forwarding. Use it from the start.
-
-**Live USB installs nothing.** Fedora's live environment is a RAM-based OS — nothing persists on reboot. Always install to disk before configuring anything.
-
-**Wildcard RPM installs will pick up broken files.** A failed `curl` that saves an XML error as a `.rpm` will break `rpm -i *.rpm`. Always check what's in the directory before installing.
-
-**Document every failure.** Eight documented Wazuh install failures before pivoting to better hardware. Each one is a lesson that sticks.
+**Document every failure.** Each one is a lesson that compounds.
 
 ---
 
-## Roadmap
+## 🗺️ Roadmap
 
 - [x] Proxmox VE hypervisor
 - [x] OPNsense virtual firewall
 - [x] Kali Linux attack VM
 - [x] Pi-hole DNS filtering
-- [x] Zeek network monitoring
-- [x] Tailscale remote access
+- [x] Zeek 8.1.1 network monitoring
+- [x] Tailscale mesh VPN
 - [x] Splunk Enterprise SIEM
-- [x] Universal Forwarder on Kali
-- [x] Dedicated lab terminal (HP ProBook 650 G8 / Fedora 43)
-- [x] Full attack tooling (Metasploit, Burp, gobuster, ffuf, hydra, nikto)
+- [x] Universal Forwarder — Kali → Splunk
+- [x] HP ProBook 650 G8 attack terminal (Fedora 43)
+- [x] Full offensive toolkit (Metasploit · Burp · gobuster · ffuf · hydra · nikto)
 - [x] Ansible lab automation
-- [x] Splunk UF on ProBook
-- [ ] Wazuh on ProLiant (in progress)
-- [ ] Windows Server 2022 AD lab
-- [ ] BloodHound enumeration scenarios
-- [ ] Attack/detect scenarios (Kerberoasting, Pass-the-Hash, DCSync)
+- [x] Universal Forwarder — ProBook → Splunk
+- [x] Dotfiles repo
+- [ ] **Wazuh full stack on ProLiant** ← next
+- [ ] Windows Server 2022 Active Directory lab
+- [ ] BloodHound enumeration
+- [ ] Kerberoasting / Pass-the-Hash / DCSync scenarios
 - [ ] Wazuh → Splunk alert forwarding
-- [ ] AWS/Azure integration
+- [ ] CTF writeups in Obsidian
 - [ ] Rubber Ducky payload lab
+- [ ] AWS/Azure cloud integration
 
 ---
 
-## Access Reference
+## 🔗 Access Reference
 
-| System | Address |
-|---|---|
-| Proxmox (local) | `https://100.90.195.73:8006` |
-| Proxmox (remote) | `https://100.119.210.126:8006` |
-| Splunk Web | `http://100.81.37.2:8000` |
-| OPNsense | `https://192.168.1.1` |
-| Pi SSH | `ssh pi` |
-| Kali SSH | `ssh kali` |
-| Splunk SSH | `ssh splunk` |
-| Proxmox SSH | `ssh proxmox` |
-| ProLiant SSH | `ssh proliant` |
+| System | Address | Protocol |
+|---|---|---|
+| Proxmox Web UI | `https://100.90.195.73:8006` | HTTPS |
+| ProLiant Web UI | `https://100.119.210.126:8006` | HTTPS |
+| Splunk Web | `http://100.81.37.2:8000` | HTTP |
+| OPNsense | `https://192.168.1.1` | HTTPS |
+| Pi-hole | `http://100.119.34.79/admin` | HTTP |
+| Proxmox SSH | `ssh proxmox` | SSH/Tailscale |
+| Pi SSH | `ssh pi` | SSH/Tailscale |
+| Kali SSH | `ssh kali` | SSH/Tailscale |
+| Splunk SSH | `ssh splunk` | SSH/Tailscale |
+| ProLiant SSH | `ssh proliant` | SSH/Tailscale |
 
 ---
 
-**B.S. Cybersecurity (in progress) · CompTIA Security+ · Microsoft AZ-900**
+<div align="center">
+
+**B.S. Cybersecurity** *(in progress)* · **CompTIA Security+** · **Microsoft AZ-900**
 
 *Certs teach you concepts. Labs teach you how things actually break.*
+
+</div>
