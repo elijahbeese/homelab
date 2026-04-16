@@ -1,3 +1,5 @@
+<div align="center">
+
 ```
 ██╗      █████╗ ██████╗     ███████╗███████╗ ██████╗
 ██║     ██╔══██╗██╔══██╗    ██╔════╝██╔════╝██╔════╝
@@ -8,848 +10,502 @@
 ```
 
 ![Status](https://img.shields.io/badge/status-active-00ff88?style=for-the-badge&labelColor=0d1117)
+![Proxmox](https://img.shields.io/badge/Proxmox-9.1.1-e57000?style=for-the-badge&labelColor=0d1117)
 ![Splunk](https://img.shields.io/badge/Splunk-10.2.1-ff6b35?style=for-the-badge&labelColor=0d1117)
-![Proxmox](https://img.shields.io/badge/Proxmox-9.1-e57000?style=for-the-badge&labelColor=0d1117)
 ![Tailscale](https://img.shields.io/badge/Tailscale-connected-4a9eff?style=for-the-badge&labelColor=0d1117)
 ![Fedora](https://img.shields.io/badge/Fedora-43-51a2da?style=for-the-badge&labelColor=0d1117)
+![Wazuh](https://img.shields.io/badge/Wazuh-4.14-005571?style=for-the-badge&labelColor=0d1117)
 
-**A hands-on enterprise-grade security lab built from commodity hardware.**
-Attack. Detect. Defend. Repeat.
+**A full-spectrum offensive and defensive security lab built from commodity hardware.**
+
+*Real attacks. Real detections. Real skill.*
+
+</div>
+
+---
+
+## What This Is
+
+This is not a homelab for running Plex or replacing Google Drive. This is an enterprise-grade security operations environment built to simulate real attack scenarios, develop detection engineering skills, and build a portfolio for a career in cybersecurity.
+
+Every component was deliberately chosen, manually configured, and broken at least twice before it worked. That's the point.
+
+Built across three physical locations on repurposed enterprise hardware and consumer gear — because that's what real labs look like.
 
 ---
 
 ## Table of Contents
 
-- [Infrastructure](#infrastructure)
-- [Hacker Laptop — Fedora 43](#hacker-laptop--fedora-43)
-  - [Privacy & VPN](#privacy--vpn)
-  - [Browsers & Anonymity](#browsers--anonymity)
-  - [Offensive Security Tools](#offensive-security-tools)
-  - [WiFi & Wireless Auditing](#wifi--wireless-auditing)
-  - [Reverse Engineering & Forensics](#reverse-engineering--forensics)
-  - [OSINT](#osint)
-  - [Password Cracking](#password-cracking)
-  - [Network Tools](#network-tools)
-  - [AI & Local LLM](#ai--local-llm)
-  - [Engineering & Hardware](#engineering--hardware)
-  - [Privacy & System Tools](#privacy--system-tools)
-  - [Wordlists & Payloads](#wordlists--payloads)
-- [Installation Notes & Gotchas](#installation-notes--gotchas)
+- [Hardware](#hardware)
+- [Network Architecture](#network-architecture)
+- [Infrastructure Stack](#infrastructure-stack)
+  - [OptiPlex — Local Hypervisor](#optiplex--local-hypervisor)
+  - [ProLiant — Remote Heavy-Lift Node](#proliant--remote-heavy-lift-node)
+  - [Raspberry Pi 5 — Perimeter Node](#raspberry-pi-5--perimeter-node)
+  - [ProBook 650 G8 — Attack Terminal](#probook-650-g8--attack-terminal)
+- [Access Reference](#access-reference)
+- [Tool Reference](#tool-reference)
+- [Lessons Learned](#lessons-learned)
+- [Roadmap](#roadmap)
 
 ---
 
-## Infrastructure
+## Hardware
 
-| Component | Role | Specs |
+| Device | Specs | Role | Location |
+|---|---|---|---|
+| **Dell OptiPlex 7010** | i5-3570 @ 3.4GHz · 15.5GB RAM · HDD | Primary hypervisor (Proxmox) | Tampa apartment |
+| **HP ProLiant DL360 G7** | 2x Xeon X5650 · 32GB RAM · 4x SAS | Remote heavy-lift node | Iowa (co-located) |
+| **HP ProBook 650 G8** | i7-1165G7 · 16GB RAM · 475GB NVMe | Dedicated attack terminal | Tampa (daily driver) |
+| **Raspberry Pi 5** | BCM2712 · 8GB RAM · Vilros kit | DNS sinkhole + network monitoring | Tampa apartment |
+| **TP-Link TL-SG108E** | 8-port managed gigabit | Lab switching + VLANs | Tampa apartment |
+| **MacBook Air M2** | Apple M2 · macOS 13.5 | Secondary management workstation | Tampa |
+
+---
+
+## Network Architecture
+
+```
+                            INTERNET
+                                |
+                  Apartment Router (172.20.x.x)
+                  WARNING: NAT only, no port forwarding
+                                |
+                   +------------+------------+
+                   |                         |
+          OptiPlex (Ethernet)          ProBook (WiFi)
+          172.20.16.175                172.20.x.x
+                   |
+         +---------------------+
+         |   Proxmox VE 9.1.1  |
+         +---------------------+
+                   |
+      +------------+-------------+
+      |            |             |
+  OPNsense       Kali         Splunk
+  VM 200         VM 100       VM 101
+  192.168.1.1    .100         .103
+  (firewall)   (attack)      (SIEM)
+      |
+  TP-Link Switch
+      |
+  Raspberry Pi 5
+  Pi-hole + Zeek
+
+
+  IOWA -----------------------------------------------
+  HP ProLiant DL360 G7
+  Tailscale: 100.119.210.126
+  +-- Wazuh 4.14 (manager + indexer + dashboard)
+  +-- Windows Server 2022 AD lab (planned)
+  +-- BloodHound lab (planned)
+
+  TAILSCALE MESH (punches through apartment NAT)
+  ---------------------------------------------------
+  fedora (ProBook)    100.74.18.2
+  macbook             100.104.62.66
+  kali                100.77.251.92
+  proxmox             100.90.195.73
+  splunk              100.81.37.2
+  raspberrypi         100.119.34.79
+  proliant            100.119.210.126
+```
+
+**Key design decisions:**
+- Apartment NAT blocks all inbound traffic — Tailscale solves remote access via outbound-only connections, no port forwarding required
+- OPNsense runs as a Proxmox VM because Pi 5 cannot run it (ARM64 support was dropped)
+- DNS chain: Lab VMs → OPNsense Unbound → Pi-hole → upstream resolvers
+- ProLiant in Iowa handles workloads the OptiPlex HDD cannot sustain (Wazuh/OpenSearch require sustained I/O)
+
+---
+
+## Infrastructure Stack
+
+### OptiPlex — Local Hypervisor
+
+**Hardware:** Dell OptiPlex 7010 · i5-3570 @ 3.4GHz · 15.5GB RAM · spinning HDD
+
+**Proxmox VE 9.1.1** — Bare metal Type 1 hypervisor. Web UI at `https://100.90.195.73:8006`.
+
+**Setup process:**
+- Flashed Proxmox ISO to USB via Balena Etcher on MacBook
+- Booted OptiPlex from USB (F12 boot menu), installed to local disk
+- Configured static IP, enabled SSH, installed Tailscale
+- Created virtual network bridges: `vmbr0` (WAN/apartment) and `vmbr1` (lab LAN)
+
+---
+
+#### OPNsense `VM 200 · 192.168.1.1`
+
+Virtual firewall and router. Handles all routing, NAT, DHCP, and DNS for the `192.168.1.x` lab subnet. Segments the lab from the apartment network completely.
+
+**Configuration:**
+- WAN interface: bridged to `vmbr0` (apartment network, gets DHCP from apartment router)
+- LAN interface: bridged to `vmbr1` (lab subnet `192.168.1.0/24`)
+- DNS: Unbound configured to forward all queries to Pi-hole at `172.20.17.132`
+- DHCP: serving `192.168.1.100–200` range
+- WireGuard instance configured for future road-warrior VPN use
+
+**Why a VM instead of the Pi:** OPNsense and pfSense both dropped ARM64 support. The Pi 5 physically cannot run either. Virtual firewall on Proxmox is the correct solution for an apartment lab without a dedicated router.
+
+---
+
+#### Kali Linux `VM 100 · 192.168.1.100`
+
+Primary attack platform. Full offensive toolkit. Tailscale installed for direct remote SSH access (`ssh kali@100.77.251.92`).
+
+**Splunk Universal Forwarder** installed and configured to ship logs to `192.168.1.103:9997`. Currently forwarding 40,000+ events.
+
+---
+
+#### Splunk Enterprise 10.2.1 `VM 101 · 192.168.1.103`
+
+SIEM. Web UI at `http://100.81.37.2:8000`.
+
+**Ingesting logs from:**
+- Kali Linux VM via Universal Forwarder
+- ProBook (Fedora 43) via Universal Forwarder
+- Total: 40,000+ events
+
+**Setup:**
+- Ubuntu Server VM on Proxmox
+- Splunk Enterprise installed via `.deb`
+- Universal Forwarder deployed on Kali and ProBook, pointing to `192.168.1.103:9997`
+- Created dedicated index for lab data
+
+**License:** Free perpetual after 60-day trial. 500MB/day ingest cap — sufficient for lab volumes.
+
+---
+
+### ProLiant — Remote Heavy-Lift Node
+
+**Hardware:** HP ProLiant DL360 G7 · 2x Intel Xeon X5650 (12 cores/24 threads total) · 32GB DDR3 ECC RAM · 4x SAS drives · iDRAC remote management
+
+**Location:** Iowa, co-located. Accessed exclusively via Tailscale (`100.119.210.126`). No physical access needed — iDRAC handles out-of-band management.
+
+This server exists because the OptiPlex's spinning HDD causes I/O timeouts that kill OpenSearch and Elasticsearch initialization. Wazuh failed to install on the OptiPlex 8+ times across multiple methods. The ProLiant's SAS drives and 32GB ECC RAM handle it without issue.
+
+**Proxmox VE** installed as hypervisor — same stack as local node.
+
+---
+
+#### Wazuh 4.14 *(deploying)*
+
+Full HIDS/EDR stack: Wazuh Manager + OpenSearch Indexer + Dashboard.
+
+**Why it failed on the OptiPlex:** Wazuh's quick-install script deploys OpenSearch, a Java-based Elasticsearch fork. On a spinning HDD, OpenSearch JVM initialization hits I/O timeouts during index mapping and cluster formation. After 8 documented failures (OVA import, quick install script, manual step-by-step, different Ubuntu versions), the root cause was hardware — not configuration.
+
+**Why it works on the ProLiant:** SAS drives with adequate sustained IOPS. 32GB RAM means no swapping during Java heap allocation. Problem solved by moving to appropriate hardware.
+
+**Planned agent deployment:**
+- Kali Linux VM
+- Splunk VM
+- ProBook (Fedora 43)
+- Windows Server VMs (when built)
+
+**Dashboard:** `http://100.119.210.126:443` via Tailscale
+
+---
+
+#### Windows Server 2022 Active Directory Lab *(planned)*
+
+Domain controller + domain-joined Windows 10/11 victim VMs.
+
+**Attack scenarios to run:**
+- BloodHound — enumerate AD, find attack paths to Domain Admin
+- Kerberoasting — request service tickets, crack offline
+- Pass-the-Hash — lateral movement with NTLM hashes
+- DCSync — dump domain credentials via replication rights
+- ASREPRoasting — target accounts without Kerberos pre-auth required
+
+**Detection:** All Windows event logs forwarded to Wazuh agents → Splunk for correlation. Goal is to run the attack, watch it appear in the SIEM, and write detection rules.
+
+---
+
+### Raspberry Pi 5 — Perimeter Node
+
+**Hardware:** Raspberry Pi 5 · BCM2712 quad-core Cortex-A76 · 8GB RAM · Vilros case with active cooler · official 27W USB-C PSU
+
+**Location:** Tampa apartment, connected to TP-Link switch
+
+---
+
+#### Pi-hole
+
+Network-wide DNS sinkhole. Every DNS query from every device on the lab network flows through Pi-hole before hitting upstream resolvers.
+
+**DNS chain:** Lab VMs → OPNsense Unbound → Pi-hole (`172.20.17.132`) → `1.1.1.1` / `8.8.8.8`
+
+**Why it matters for security:** Malware C2 beaconing shows up as anomalous DNS queries here before any other detection layer catches it. Real-time feed via `pihole -t` shows every DNS request on the network as it happens. Blocklists catch known malicious domains before connections are even attempted.
+
+**Access:** `http://100.119.34.79/admin`
+
+---
+
+#### Zeek 8.1.1
+
+Passive network traffic analysis engine on `eth0`. Captures and parses all network traffic into structured logs without transmitting anything.
+
+**Log types:**
+- `conn.log` — every TCP/UDP connection: source, dest, duration, bytes, state
+- `dns.log` — every DNS query and response
+- `http.log` — HTTP requests, methods, user agents, URIs, status codes
+- `ssl.log` — TLS handshakes, certificate details, cipher suites
+- `files.log` — files transferred over the network, hashes
+- `weird.log` — protocol violations and anomalies
+
+**Notable catches during setup:**
+- TP-Link switch spamming DHCP DISCOVER from `192.168.0.1` — subnet mismatch, harmless but visible
+- WireGuard traffic fingerprinted in `weird.log` via UDP checksum anomaly on own public IP
+
+**Log location:** `/opt/zeek/logs/current/`
+
+---
+
+### ProBook 650 G8 — Attack Terminal
+
+**Hardware:** HP ProBook 650 G8 · 11th Gen Intel i7-1165G7 (8 threads @ 2.8GHz boost) · 16GB DDR4 · 475GB NVMe SSD · Intel Iris Xe integrated graphics · 1920x1080 display
+
+**OS:** Fedora 43 Workstation · Full-disk LUKS2 encryption (passphrase required on boot)
+
+**Shell environment:**
+- zsh + Oh My Zsh framework
+- Powerlevel10k prompt (instant prompt enabled)
+- zsh-autosuggestions + zsh-syntax-highlighting
+- fzf fuzzy finder integrated into history and file search
+- Custom `.p10k.zsh` configuration
+
+**Terminal:** Ptyxis · tmux with custom prefix, split keybindings, and status bar
+
+**Editor:** Neovim with full IDE stack:
+- LSP (language server protocol) for code intelligence
+- Treesitter for syntax highlighting
+- Telescope for fuzzy file/grep search
+- Catppuccin color theme
+- Custom `init.lua` configuration
+
+**System hardening:**
+- Full-disk LUKS2 encryption
+- `auditd` — kernel-level system call audit logging
+- `fail2ban` — automatic SSH brute-force lockout
+- `rkhunter` — rootkit scanning (498 checks, 0 warnings)
+- `ClamAV` — on-demand malware scanning
+
+**Infrastructure tooling:**
+- Tailscale — zero-config mesh VPN to all lab nodes
+- Splunk Universal Forwarder 10.2.2 — shipping local logs to SIEM
+- Ansible — playbooks for lab node management and automation
+- Remmina — RDP/VNC/SSH graphical remote desktop
+- virt-manager — local VM management via libvirt/QEMU
+
+---
+
+#### Attack & Security Tooling
+
+| Tool | Command / Access | Purpose |
 |---|---|---|
-| Dell OptiPlex | Proxmox Hypervisor | i5, 16GB RAM, 512GB SSD |
-| Raspberry Pi 5 | OPNsense Router/Firewall | 8GB RAM |
-| TP-Link Switch | Network switching | 8-port unmanaged |
-| HP Laptop (this machine) | Hacker Laptop | i7-1165G7, 16GB RAM, Iris Xe |
+| Metasploit 6.4 | `msfconsole` | Exploitation framework |
+| Burp Suite Community | Desktop icon | Web app proxy and interceptor |
+| Bettercap | `sudo bettercap` | Network attacks, ARP spoofing, WiFi |
+| nmap | `nmap` | Network discovery and port scanning |
+| Wireshark | Desktop icon | GUI packet capture and analysis |
+| gobuster | `gobuster` | Directory and DNS brute-forcing |
+| ffuf | `ffuf` | Fast web content fuzzing |
+| hydra | `hydra` | Online credential brute-forcing |
+| nikto | `nikto` | Web server vulnerability scanning |
+| sqlmap | `sqlmap` | SQL injection detection and exploitation |
+| Ghidra 12.0.4 | Desktop icon / `ghidra` | NSA reverse engineering framework |
+| Radare2 | `r2` | Binary analysis, disassembly, debugging |
+| Binwalk | `binwalk` | Firmware analysis and extraction |
+| ImHex | `imhex` | Hex editor with pattern language |
+| Steghide | `steghide` | Steganography — hide/extract data in images |
+| ExifTool | `exiftool` | File metadata extraction and stripping |
+| Proxychains | `proxychains <cmd>` | Force traffic through proxy chains |
+| Aircrack-ng | `aircrack-ng` | WiFi packet capture and WEP/WPA cracking |
+| Kismet | `sudo kismet` → `localhost:2501` | Passive wireless network detection |
+| hcxdumptool | `sudo hcxdumptool` | WiFi PMKID/handshake capture |
+| hcxtools | `hcxpcapngtool` | Convert WiFi captures for hashcat |
+| Hashcat | `hashcat` | GPU-accelerated password cracking |
+| John the Ripper | `john` | CPU password cracking |
+| theHarvester | `theHarvester` | Email, subdomain, IP OSINT |
+| Sherlock | `sherlock` | Username search across 300+ platforms |
+| Maltego | Desktop icon | Visual link analysis (broken — Java compat issue) |
+| SecLists | `/usr/share/seclists/` | Comprehensive security wordlist collection |
 
-**VMs running on Proxmox:**
-- Kali Linux — primary attack VM
-- Metasploitable — intentionally vulnerable target
-- Wazuh — SIEM/EDR
-- Ubuntu Server — general purpose
+#### Privacy & Anonymity
 
----
+| Tool | Access | Purpose |
+|---|---|---|
+| ProtonVPN | Desktop icon | Swiss VPN, no-logs, open source |
+| Tor Browser | Desktop icon | Anonymous browsing via Tor network |
+| KeePassXC | Desktop icon | Offline encrypted password manager |
+| BleachBit | Desktop icon | Secure deletion and privacy cleaning |
+| Signal | Desktop icon | E2E encrypted messaging |
 
-## Hacker Laptop — Fedora 43
+#### Local AI
 
-**Hardware:** HP laptop, 11th Gen Intel i7-1165G7 (8 cores @ 2.8GHz), 16GB RAM, Intel Iris Xe Graphics
-**OS:** Fedora 43 Workstation
-**Shell:** zsh + Oh My Zsh + Powerlevel10k
+| Tool | Access | Purpose |
+|---|---|---|
+| Ollama | `ollama run llama3.2` | Local LLM inference — no internet required |
+| llama3.2 (3.2B) | via Ollama | Installed local model |
+| Open WebUI | `http://localhost:3000` | Browser-based ChatGPT-style UI for Ollama |
 
----
+Open WebUI runs as a Docker container (`--restart always`) and survives reboots. Ollama connects via `http://172.17.0.1:11434`. Everything runs offline — zero data leaves the machine.
 
-### Privacy & VPN
+#### Hardware & Engineering
 
-#### ProtonVPN
-**What it is:** Privacy-focused VPN with a strict no-logs policy, based in Switzerland. Open source and independently audited.
-
-**Access:** Desktop icon or terminal
-```bash
-proton-vpn-gnome-desktop
-```
-
-**Use cases:**
-- Encrypt traffic on untrusted networks
-- Bypass geo-restrictions
-- Hide traffic from ISP/university network monitoring
-- Route traffic through Secure Core servers for extra anonymity
-
-**Installation notes:** University network blocks protonvpn.com DNS and port 53 outbound. Had to:
-1. Use DNS-over-HTTPS via `https://1.1.1.1/dns-query` to resolve IPs
-2. Hardcode IPs in `/etc/hosts`
-3. Find correct RPM version (`1.0.3-1` not `1.0.1-2`) by browsing repo directory
-4. Install with `sudo dnf install -y https://repo.protonvpn.com/fedora-43-stable/protonvpn-stable-release/protonvpn-stable-release-1.0.3-1.noarch.rpm`
-5. Then `sudo dnf install -y proton-vpn-gnome-desktop`
-
----
-
-### Browsers & Anonymity
-
-#### Tor Browser
-**What it is:** Browser that routes traffic through the Tor anonymity network, bouncing it through 3+ relays before reaching the destination. Makes traffic extremely difficult to trace.
-
-**Access:** Desktop icon or terminal
-```bash
-torbrowser-launcher
-```
-
-**Use cases:**
-- Anonymous browsing
-- Accessing .onion sites
-- Bypassing censorship
-- Research without leaving a trail
-
-**Installation:**
-```bash
-sudo dnf install -y tor torbrowser-launcher
-```
-First launch downloads the actual Tor Browser bundle automatically.
+| Tool | Access | Purpose |
+|---|---|---|
+| Arduino IDE | Desktop icon | Microcontroller programming |
+| KiCad | Desktop icon | Professional PCB design suite |
+| Fritzing | Desktop icon | Breadboard circuit prototyping |
+| Minicom | `sudo minicom -D /dev/ttyUSB0 -b 115200` | Serial terminal for embedded devices |
+| Picocom | `sudo picocom /dev/ttyUSB0 -b 115200` | Lightweight serial terminal |
 
 ---
 
-### Offensive Security Tools
+## Access Reference
 
-#### Metasploit Framework
-**What it is:** The industry-standard penetration testing framework. Contains hundreds of exploits, payloads, and auxiliary modules.
+| System | Address | Notes |
+|---|---|---|
+| Proxmox (local) | `https://100.90.195.73:8006` | OptiPlex hypervisor |
+| Proxmox (Iowa) | `https://100.119.210.126:8006` | ProLiant hypervisor |
+| Splunk Web | `http://100.81.37.2:8000` | SIEM dashboard |
+| OPNsense | `https://192.168.1.1` | Firewall (lab network only) |
+| Pi-hole | `http://100.119.34.79/admin` | DNS dashboard |
+| Wazuh Dashboard | `http://100.119.210.126:443` | EDR/HIDS (deploying) |
+| Open WebUI | `http://localhost:3000` | Local AI chat interface |
+| Ollama API | `http://localhost:11434` | LLM inference API |
 
-**Access:** Desktop icon (launches terminal) or:
+**SSH (all via Tailscale):**
 ```bash
-msfconsole
-```
-
-**Use cases:**
-- Exploit known vulnerabilities in target systems
-- Generate payloads (reverse shells, meterpreter sessions)
-- Post-exploitation (privilege escalation, lateral movement)
-- Vulnerability scanning
-
-**Common commands:**
-```bash
-msfconsole                    # launch
-search <exploit name>         # find modules
-use <module>                  # select module
-set RHOSTS <target IP>        # set target
-set PAYLOAD <payload>         # set payload
-run / exploit                 # execute
-```
-
-#### Burp Suite Community
-**What it is:** Web application security testing platform. Intercepts and manipulates HTTP/S traffic between browser and web server.
-
-**Access:** Desktop icon or terminal
-```bash
-burpsuite
-```
-
-**Use cases:**
-- Web app pentesting
-- Intercept and modify HTTP requests
-- Scan for SQLi, XSS, IDOR, and other web vulns
-- Fuzz parameters
-- Brute force login forms
-
-#### Bettercap
-**What it is:** Swiss army knife for network attacks and monitoring. Handles WiFi, BLE, HID, and Ethernet attacks.
-
-**Access:** Terminal only
-```bash
-sudo bettercap
-```
-
-**Use cases:**
-- ARP spoofing / MITM attacks
-- Network sniffing
-- WiFi deauth attacks
-- Credential harvesting on local network
-- BLE device scanning
-
-**Installation notes:** Not in Fedora repos. Built from source with Go:
-```bash
-sudo dnf install -y golang libusb1-devel libnetfilter_queue-devel libpcap-devel
-go install github.com/bettercap/bettercap@latest
-echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.zshrc
-```
-
-#### Nikto
-**What it is:** Web server scanner that checks for dangerous files, outdated software, and misconfigurations.
-
-**Access:** Terminal
-```bash
-nikto -h <target>
-```
-
-**Use cases:**
-- Quick web server vulnerability scan
-- Find exposed admin panels
-- Detect default credentials
-- Identify outdated software versions
-
-#### SQLmap
-**What it is:** Automated SQL injection tool. Detects and exploits SQL injection flaws in web applications.
-
-**Access:** Terminal
-```bash
-sqlmap -u "http://target.com/page?id=1"
-```
-
-**Use cases:**
-- Detect SQL injection vulnerabilities
-- Extract database contents
-- Dump usernames and passwords
-- Bypass authentication
-
-#### Hydra
-**What it is:** Fast and flexible online password brute-forcing tool supporting 50+ protocols.
-
-**Access:** Terminal
-```bash
-hydra -l admin -P /usr/share/seclists/Passwords/Common-Credentials/10-million-password-list-top-1000.txt ssh://target
-```
-
-**Use cases:**
-- Brute force SSH, FTP, HTTP, RDP, and more
-- Credential stuffing attacks
-- Dictionary attacks against login forms
-
-#### Gobuster / ffuf
-**What it is:** Directory/file fuzzing tools that brute force URLs to find hidden content.
-
-**Access:** Terminal
-```bash
-gobuster dir -u http://target.com -w /usr/share/seclists/Discovery/Web-Content/common.txt
-ffuf -u http://target.com/FUZZ -w /usr/share/seclists/Discovery/Web-Content/common.txt
-```
-
-**Use cases:**
-- Find hidden directories and files
-- Enumerate subdomains
-- Fuzz parameters
-- Find admin panels
-
-#### Proxychains
-**What it is:** Forces any TCP connection to go through a proxy (SOCKS4, SOCKS5, HTTP). Chains multiple proxies together.
-
-**Access:** Terminal — prepend to any command
-```bash
-proxychains nmap -sT target
-proxychains curl http://target.com
-```
-
-**Config:** `/etc/proxychains.conf`
-
-**Use cases:**
-- Route tool traffic through Tor
-- Chain multiple proxies for anonymity
-- Bypass IP-based blocks
-
----
-
-### WiFi & Wireless Auditing
-
-#### Aircrack-ng Suite
-**What it is:** Complete suite for WiFi security auditing. Includes tools for capturing, analyzing, and cracking WiFi traffic.
-
-**Access:** Terminal
-```bash
-airmon-ng start wlan0          # enable monitor mode
-airodump-ng wlan0mon           # capture packets
-aircrack-ng capture.cap -w wordlist.txt  # crack
-```
-
-**Use cases:**
-- WPA/WPA2 handshake capture
-- Crack captured handshakes
-- Deauthentication attacks
-- Fake AP creation
-
-#### Kismet
-**What it is:** Wireless network detector, sniffer, and intrusion detection system. Passive — doesn't transmit.
-
-**Access:** Terminal
-```bash
-sudo kismet
-```
-Then open browser at `http://localhost:2501`
-
-**Use cases:**
-- Passive WiFi network discovery
-- Detect hidden SSIDs
-- Monitor for rogue APs
-- Bluetooth device detection
-- Log all nearby wireless traffic
-
-#### hcxdumptool + hcxtools
-**What it is:** Tools for capturing and converting WiFi traffic for use with hashcat. More powerful than aircrack-ng for modern WPA3.
-
-**Access:** Terminal
-```bash
-sudo hcxdumptool -i wlan0 -o capture.pcapng --active_beacon
-hcxpcapngtool capture.pcapng -o hashes.hc22000
-hashcat -m 22000 hashes.hc22000 wordlist.txt
-```
-
-**Use cases:**
-- Capture WPA/WPA2/WPA3 handshakes
-- PMKID attacks (no client needed)
-- Convert captures for hashcat
-
-**Installation notes:** Not in Fedora repos. Built from source:
-```bash
-git clone https://github.com/ZerBea/hcxdumptool.git
-cd hcxdumptool && make && sudo make install
+ssh root@100.90.195.73      # proxmox (local)
+ssh root@100.119.210.126    # proxmox (iowa / proliant)
+ssh elijah@100.77.251.92    # kali
+ssh elijah@100.81.37.2      # splunk
+ssh elijah@100.119.34.79    # raspberry pi
 ```
 
 ---
 
-### Reverse Engineering & Forensics
+## Tool Reference
 
-#### Ghidra
-**What it is:** NSA's open-source reverse engineering framework. Disassembles and decompiles binaries into readable code.
-
-**Access:** Desktop icon or terminal
+**Network recon:**
 ```bash
-ghidra
+nmap -sV -sC -A 192.168.1.0/24           # full subnet scan with service detection
+nmap -p- --min-rate 5000 192.168.1.100   # all 65535 ports fast
 ```
 
-**Use cases:**
-- Analyze malware
-- Reverse engineer binaries
-- Find vulnerabilities in compiled software
-- CTF challenges
-- Firmware analysis
-
-**Installation notes:**
-- Downloaded release ZIP from https://github.com/NationalSecurityAgency/ghidra/releases
-- Extracted to `/opt/ghidra_12.0.4_PUBLIC/`
-- Requires Java 21 JDK: `sudo dnf install -y java-21-openjdk-devel`
-- On first run, manually specify JDK path: `/usr/lib/jvm/java-21-openjdk-21.0.10.0.7-2.fc43.x86_64`
-- Symlinked: `sudo ln -sf /opt/ghidra_12.0.4_PUBLIC/ghidraRun /usr/local/bin/ghidra`
-
-#### Radare2
-**What it is:** Open-source reverse engineering framework and binary analysis toolset. Terminal-based, extremely powerful.
-
-**Access:** Terminal
+**Web app recon:**
 ```bash
-r2 <binary>           # open binary
-r2 -d <binary>        # open in debug mode
+gobuster dir -u http://target -w /usr/share/seclists/Discovery/Web-Content/common.txt
+ffuf -u http://target/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt
+nikto -h http://target
+sqlmap -u "http://target/page?id=1" --dbs
 ```
 
-**Common r2 commands:**
-```
-aaa          # analyze all
-pdf @ main   # disassemble main function
-iz           # list strings
-ii           # list imports
-VV           # visual graph mode
-```
-
-**Use cases:**
-- Binary analysis and disassembly
-- Debugging
-- Exploit development
-- CTF challenges
-- Malware analysis
-
-#### Binwalk
-**What it is:** Firmware analysis and extraction tool. Identifies and extracts embedded files and code from firmware images.
-
-**Access:** Terminal
+**WiFi auditing:**
 ```bash
-binwalk firmware.bin
-binwalk -e firmware.bin    # extract
+airmon-ng start wlan0                     # monitor mode
+airodump-ng wlan0mon                      # discover networks
+sudo hcxdumptool -i wlan0 -o cap.pcapng --active_beacon
+hcxpcapngtool cap.pcapng -o hashes.hc22000
+hashcat -m 22000 hashes.hc22000 /usr/share/seclists/Passwords/WiFi-WPA/probable-v2-wpa-top4800.txt
 ```
 
-**Use cases:**
-- IoT device firmware analysis
-- Extract hidden files from images
-- Find embedded filesystems
-- Identify compression and encryption
-
-#### ImHex
-**What it is:** Feature-rich hex editor with pattern language, data visualization, and disassembler.
-
-**Access:** Terminal or app launcher
+**Password cracking:**
 ```bash
-imhex
+hashcat -m 0    hashes.txt wordlist.txt   # MD5
+hashcat -m 1000 hashes.txt wordlist.txt   # NTLM (Windows)
+hashcat -m 1800 hashes.txt wordlist.txt   # SHA-512 Unix
+hashcat -m 22000 hashes.txt wordlist.txt  # WPA2
+john --wordlist=/usr/share/seclists/Passwords/Leaked-Databases/rockyou.txt hashes.txt
 ```
 
-**Use cases:**
-- Analyze binary files
-- Craft custom payloads
-- Reverse engineer file formats
-- USB Rubber Ducky payload crafting
-
-#### Steghide
-**What it is:** Steganography tool that hides data inside image and audio files.
-
-**Access:** Terminal
+**OSINT:**
 ```bash
-steghide embed -cf image.jpg -sf secret.txt    # hide data
-steghide extract -sf image.jpg                  # extract data
+theHarvester -d target.com -b all         # emails, subdomains, IPs from public sources
+sherlock username                          # find username on 300+ platforms
+exiftool image.jpg                         # extract GPS, device info from photo metadata
+exiftool -all= image.jpg                   # strip all metadata before sharing
 ```
 
-**Use cases:**
-- Hide data inside images
-- CTF steganography challenges
-- Covert data exfiltration
-- Detect hidden data in files
-
-#### ExifTool
-**What it is:** Reads, writes, and edits metadata in image, audio, video, and document files.
-
-**Access:** Terminal
+**Anonymity:**
 ```bash
-exiftool image.jpg          # read metadata
-exiftool -all= image.jpg    # strip all metadata
+proxychains nmap -sT target               # route nmap through proxy chain
+# Edit /etc/proxychains.conf: add "socks5 127.0.0.1 9050" for Tor routing
 ```
 
-**Use cases:**
-- OSINT — extract GPS coordinates, device info from photos
-- Strip metadata before sharing files
-- Forensic investigation of files
-- CTF challenges
-
----
-
-### OSINT
-
-#### Maltego
-**What it is:** Visual link analysis and data mining tool. Maps relationships between people, organizations, domains, IPs, and more.
-
-**Access:** Desktop icon or terminal
+**Reverse engineering:**
 ```bash
-maltego
-```
-
-**Note:** Currently broken on Fedora 43 due to Java compatibility issues (requires Java 11/17, only 21/25 available). Use web version at maltego.com or run via Docker with older Java.
-
-**Use cases:**
-- Map relationships between entities
-- Domain and IP intelligence
-- Social media investigation
-- Infrastructure mapping
-- Phishing campaign research
-
-#### theHarvester
-**What it is:** OSINT tool for gathering emails, subdomains, IPs, and URLs from public sources.
-
-**Access:** Terminal
-```bash
-theHarvester -d target.com -b google
-theHarvester -d target.com -b all
-```
-
-**Use cases:**
-- Reconnaissance on target organizations
-- Find employee email addresses
-- Discover subdomains
-- Map attack surface before a pentest
-
-**Installation:**
-```bash
-pip install theHarvester --break-system-packages
-```
-
-#### Sherlock
-**What it is:** Hunts usernames across hundreds of social media platforms simultaneously.
-
-**Access:** Terminal
-```bash
-sherlock username
-sherlock username1 username2    # multiple targets
-```
-
-**Use cases:**
-- Find all accounts associated with a username
-- OSINT on individuals
-- Investigate threat actors
-- Verify your own digital footprint
-
-**Installation:**
-```bash
-pip install sherlock-project --break-system-packages
+r2 binary                     # open in radare2
+# r2 commands: aaa (analyze), pdf@main (disassemble main), VV (visual graph)
+binwalk firmware.bin           # identify embedded files in firmware
+binwalk -e firmware.bin        # extract embedded files
+ghidra                         # launch Ghidra GUI RE framework
 ```
 
 ---
 
-### Password Cracking
+## Lessons Learned
 
-#### Hashcat
-**What it is:** World's fastest GPU-based password recovery tool. Supports 300+ hash types.
+**Wazuh on a spinning HDD is a non-starter.** OpenSearch requires sustained I/O that HDDs cannot provide. After 8 failed attempts on the OptiPlex (OVA import, quick-install script, manual install, multiple Ubuntu versions), the root cause was always hardware. Moving to the ProLiant's SAS drives solved it immediately. For any Java-based workload: SSD or don't bother.
 
-**Access:** Terminal
-```bash
-hashcat -m 0 hashes.txt wordlist.txt              # MD5
-hashcat -m 1000 hashes.txt wordlist.txt           # NTLM
-hashcat -m 22000 hashes.txt wordlist.txt          # WPA2
-hashcat -m 0 hashes.txt -a 3 ?a?a?a?a?a?a        # brute force
-```
+**OPNsense and pfSense dropped ARM64.** The Pi 5 cannot run either. Run the firewall as a Proxmox VM. This is actually fine — the VM approach gives you snapshots, easy config backups, and the ability to roll back bad firewall rules.
 
-**Common hash modes:**
-| Mode | Type |
-|------|------|
-| 0 | MD5 |
-| 100 | SHA1 |
-| 1000 | NTLM |
-| 1800 | SHA-512 Unix |
-| 22000 | WPA2 |
+**Apartment NAT kills WireGuard inbound.** The apartment router blocks all inbound UDP. WireGuard needs inbound connections. Tailscale uses outbound-only DERP relay connections and punches through NAT without any router access. Use it from day one — zero configuration, works everywhere, free for personal use.
 
-**Use cases:**
-- Crack captured WiFi handshakes
-- Crack dumped password hashes
-- Password auditing
-- CTF challenges
+**Memory ballooning starves Java workloads.** Proxmox's balloon driver dynamically restricts VM RAM to reclaim it for the host. Disable ballooning for Splunk and Wazuh VMs or watch them OOM silently under search load.
 
-**Note:** Running CPU-only mode (no NVIDIA/AMD GPU). Performance limited but functional.
+**University network blocks external DNS and specific domains.** Campus network (`spartans.ut`) blocks port 53 outbound and sinkholes certain domains (ProtonVPN, etc.). Workaround: DNS-over-HTTPS via `curl -s "https://1.1.1.1/dns-query?name=domain.com&type=A" -H "accept: application/dns-json"`, then hardcode resolved IPs in `/etc/hosts`.
 
-#### John the Ripper
-**What it is:** Classic open-source password cracker. Better than hashcat for some formats, especially Unix passwords and encrypted files.
+**Ollama needs `0.0.0.0` binding for Docker containers to reach it.** By default Ollama only listens on `127.0.0.1`. Docker containers live on a different network interface and cannot reach localhost. Fix: `Environment="OLLAMA_HOST=0.0.0.0:11434"` in systemd override, then use the docker0 bridge IP (`172.17.0.1`) in Open WebUI settings.
 
-**Access:** Terminal
-```bash
-john hashes.txt                          # auto-detect and crack
-john --wordlist=wordlist.txt hashes.txt  # dictionary attack
-john --show hashes.txt                   # show cracked passwords
-```
+**Ghidra requires the JDK, not just the JRE.** `java-21-openjdk` installs the runtime only — no `javac`. Ghidra needs the full development kit. Install `java-21-openjdk-devel` and manually specify the JDK path on first launch.
 
-**Use cases:**
-- Crack Unix/Linux password hashes
-- Crack zip, PDF, Office file passwords
-- Crack SSH private key passphrases
-- Password auditing
+**Maltego is broken on Fedora 43.** Requires Java 11 or 17 which were removed from Fedora 43 repos. Only Java 21, 25, and 26 are available. Java 21+ removed Security Manager support that Maltego depends on. Workaround: Docker with an older Java base image.
+
+**Document every failure.** Eight documented Wazuh install failures became the clearest explanation of why hardware matters. Every failure is a lesson that sticks harder than anything that works on the first try.
 
 ---
 
-### Network Tools
+## Roadmap
 
-#### Wireshark
-**What it is:** The most widely-used network protocol analyzer. Captures and analyzes network traffic in real time.
-
-**Access:** Desktop icon or terminal
-```bash
-wireshark
-```
-
-**Use cases:**
-- Capture and analyze network traffic
-- Debug network issues
-- Detect suspicious traffic
-- Analyze malware network behavior
-- Extract credentials from unencrypted protocols
-
-#### Nmap
-**What it is:** The gold standard network scanner. Discovers hosts, open ports, services, and OS information.
-
-**Access:** Terminal
-```bash
-nmap 192.168.1.1                    # basic scan
-nmap -sV -sC 192.168.1.1           # service/version detection
-nmap -A 192.168.1.0/24             # aggressive scan on subnet
-nmap -p- 192.168.1.1               # all 65535 ports
-```
-
-**Use cases:**
-- Network discovery
-- Port scanning
-- Service enumeration
-- OS fingerprinting
-- Pre-exploitation reconnaissance
-
-#### Netcat
-**What it is:** The "Swiss army knife" of networking. Creates TCP/UDP connections for data transfer, port scanning, and reverse shells.
-
-**Access:** Terminal
-```bash
-nc -lvnp 4444                          # listen on port 4444
-nc target 4444                         # connect to target
-nc -lvnp 4444 > received_file         # receive file
-```
-
-**Use cases:**
-- Set up reverse shell listeners
-- Transfer files between machines
-- Port scanning
-- Banner grabbing
-- Chat between machines
+- [x] Proxmox VE hypervisor on OptiPlex
+- [x] OPNsense virtual firewall and router
+- [x] Kali Linux attack VM
+- [x] Pi-hole DNS sinkhole
+- [x] Zeek 8.1.1 passive network monitoring
+- [x] Tailscale mesh VPN across all nodes
+- [x] Splunk Enterprise 10.2.1 SIEM
+- [x] Universal Forwarder — Kali → Splunk
+- [x] Universal Forwarder — ProBook → Splunk
+- [x] HP ProBook 650 G8 attack terminal (Fedora 43, LUKS encrypted)
+- [x] Full offensive toolkit (Metasploit, Burp, aircrack-ng, Ghidra, etc.)
+- [x] Ansible automation for lab node management
+- [x] ProtonVPN + Tor anonymity layer
+- [x] Local AI stack (Ollama + llama3.2 + Open WebUI)
+- [x] Hardware engineering tools (Arduino IDE, KiCad, Fritzing)
+- [x] Dotfiles repository
+- [ ] **Wazuh 4.14 full stack on ProLiant** ← in progress
+- [ ] Wazuh agents deployed to all nodes
+- [ ] Windows Server 2022 Active Directory lab
+- [ ] BloodHound AD enumeration
+- [ ] Attack scenarios: Kerberoasting, Pass-the-Hash, DCSync, ASREPRoasting
+- [ ] Wazuh → Splunk alert forwarding and correlation rules
+- [ ] Detection engineering for AD attack patterns
+- [ ] CTF writeups
+- [ ] Rubber Ducky / BadUSB payload lab
+- [ ] AWS/Azure cloud integration
+- [ ] Network traffic visualization (Grafana + Zeek logs)
+- [ ] Metasploitable target VM for practice
 
 ---
 
-### AI & Local LLM
+<div align="center">
 
-#### Ollama
-**What it is:** Run large language models locally on your own hardware. No internet required, completely private.
+**B.S. Cybersecurity** *(in progress)* · **CompTIA Security+** · **Microsoft AZ-900**
 
-**Access:** Terminal or via Open WebUI
-```bash
-ollama run llama3.2              # chat with llama3.2
-ollama list                      # list installed models
-ollama pull <model>              # download a model
-ollama serve                     # start API server
-```
+*Certs teach you concepts. Labs teach you how things actually break.*
 
-**Installed models:** llama3.2 (3.2B parameters)
-
-**API:** `http://localhost:11434`
-
-**Use cases:**
-- Private AI assistant with no data leaving your machine
-- Code generation and review
-- Security research assistance
-- Offline AI when on restricted networks
-
-**Installation:**
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.2
-```
-
-**Note:** Configured to listen on `0.0.0.0:11434` for Docker access:
-```bash
-# /etc/systemd/system/ollama.service.d/override.conf
-[Service]
-Environment="OLLAMA_HOST=0.0.0.0:11434"
-```
-
-#### Open WebUI
-**What it is:** ChatGPT-style web interface for Ollama. Access your local LLMs through a browser UI.
-
-**Access:** Open browser at `http://localhost:3000`
-
-**Use cases:**
-- Friendly GUI for local LLMs
-- Chat history and conversation management
-- Multiple model support
-- System prompt customization
-
-**Installation:** Runs as a Docker container
-```bash
-docker run -d \
-  -p 3000:8080 \
-  --add-host=host.docker.internal:host-gateway \
-  -v open-webui:/app/backend/data \
-  -e OFFLINE_MODE=true \
-  --name open-webui \
-  --restart always \
-  ghcr.io/open-webui/open-webui:main
-```
-
-**Persistence:** Container has `--restart always` — survives reboots automatically.
-
-**Ollama connection:** Set API URL to `http://172.17.0.1:11434` in Admin Panel → Settings → Connections.
-
----
-
-### Engineering & Hardware
-
-#### Arduino IDE
-**What it is:** Official IDE for programming Arduino microcontrollers and compatible boards.
-
-**Access:** Desktop icon or terminal
-```bash
-/opt/arduino-ide.AppImage
-```
-
-**Use cases:**
-- Program Arduino boards (Uno, Mega, Nano, etc.)
-- Develop IoT devices
-- Interface with sensors and actuators
-- Prototype hardware projects
-- Flash custom firmware
-
-**Installation:** Downloaded AppImage from arduino.cc/en/software
-```bash
-chmod +x arduino-ide.AppImage
-sudo mv arduino-ide.AppImage /opt/arduino-ide.AppImage
-```
-
-#### KiCad
-**What it is:** Professional open-source PCB design suite. Used by hobbyists and professionals to design circuit boards.
-
-**Access:** Desktop icon or terminal
-```bash
-kicad
-```
-
-**Includes:**
-- Schematic editor (eeschema)
-- PCB layout editor (pcbnew)
-- Gerber viewer
-- PCB calculator
-
-**Use cases:**
-- Design custom PCBs
-- Create schematics
-- Generate manufacturing files
-- Design custom hardware implants or tools
-
-#### Fritzing
-**What it is:** Electronics design tool focused on prototyping. Great for breadboard diagrams and simple PCB design.
-
-**Access:** Desktop icon or terminal
-```bash
-fritzing
-```
-
-**Use cases:**
-- Visualize breadboard circuits
-- Document hardware projects
-- Simple PCB design
-- Educational circuit diagrams
-
-#### Minicom / Picocom
-**What it is:** Serial terminal emulators for communicating with microcontrollers and embedded devices over UART.
-
-**Access:** Terminal
-```bash
-sudo minicom -D /dev/ttyUSB0 -b 115200
-sudo picocom /dev/ttyUSB0 -b 115200
-```
-
-**Use cases:**
-- Serial console access to Arduino, ESP32, etc.
-- Debug embedded devices
-- Access router/switch console ports
-- Communicate with IoT devices
-
----
-
-### Privacy & System Tools
-
-#### KeePassXC
-**What it is:** Offline, open-source password manager. All passwords stored locally in an encrypted database.
-
-**Access:** Desktop icon or terminal
-```bash
-keepassxc
-```
-
-**Use cases:**
-- Store all passwords securely offline
-- Generate strong random passwords
-- Store SSH keys and notes
-- No cloud sync — completely private
-
-#### BleachBit
-**What it is:** System cleaner and privacy tool. Securely deletes files and clears application data.
-
-**Access:** Desktop icon or terminal
-```bash
-bleachbit
-sudo bleachbit    # for system files
-```
-
-**Use cases:**
-- Secure file deletion
-- Clear browser history, cookies, cache
-- Free up disk space
-- Remove evidence of activity
-- Wipe free space
-
-#### Signal
-**What it is:** End-to-end encrypted messaging app.
-
-**Access:** Desktop icon
-
-**Use cases:**
-- Encrypted communications
-- Secure messaging with contacts
-- Encrypted voice/video calls
-
----
-
-### Wordlists & Payloads
-
-#### SecLists
-**What it is:** The most comprehensive collection of security wordlists. Used with virtually every offensive tool.
-
-**Location:** `/usr/share/seclists/`
-
-**Contents:**
-```
-/usr/share/seclists/
-├── Discovery/          # web content, DNS, subdomains
-├── Fuzzing/            # fuzz strings, special chars
-├── Passwords/          # password lists
-├── Payloads/           # web app payloads
-├── Pattern-Matching/   # grep patterns
-├── Usernames/          # username lists
-└── Miscellaneous/      # everything else
-```
-
-**Common usage:**
-```bash
-# Web directory fuzzing
-gobuster dir -u http://target.com -w /usr/share/seclists/Discovery/Web-Content/common.txt
-
-# Password attacks
-hydra -l admin -P /usr/share/seclists/Passwords/Common-Credentials/10-million-password-list-top-1000.txt ssh://target
-
-# Subdomain enumeration
-gobuster dns -d target.com -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt
-```
-
----
-
-## Installation Notes & Gotchas
-
-### University Network DNS Blocking
-The university network (`spartans.ut`) blocks external DNS (port 53 outbound) and specifically blocks domains like `protonvpn.com`. Workaround used throughout:
-
-```bash
-# Use DNS-over-HTTPS to resolve IPs
-curl -s "https://1.1.1.1/dns-query?name=example.com&type=A" -H "accept: application/dns-json"
-
-# Hardcode resolved IPs in /etc/hosts
-echo "IP_ADDRESS domain.com" | sudo tee -a /etc/hosts
-
-# Clean up after install
-sudo sed -i '/domain/d' /etc/hosts
-```
-
-### Ollama + Docker Networking
-Ollama by default only listens on `localhost`. To allow Docker containers to reach it:
-
-```bash
-sudo mkdir -p /etc/systemd/system/ollama.service.d
-sudo tee /etc/systemd/system/ollama.service.d/override.conf << 'EOF'
-[Service]
-Environment="OLLAMA_HOST=0.0.0.0:11434"
-EOF
-sudo systemctl daemon-reload && sudo systemctl restart ollama
-```
-
-Open WebUI connects via `http://172.17.0.1:11434` (the docker0 bridge IP).
-
-### Java Version Hell
-- Ghidra requires Java 21 JDK (not just JRE): `sudo dnf install -y java-21-openjdk-devel`
-- Maltego requires Java 11 or 17 — not available on Fedora 43. Currently broken.
-- On first Ghidra launch, manually specify: `/usr/lib/jvm/java-21-openjdk-21.0.10.0.7-2.fc43.x86_64`
-
-### Bettercap PATH
-Go installs to `~/go/bin` which isn't in PATH by default:
-```bash
-echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.zshrc
-source ~/.zshrc
-```
-
-### ProtonVPN Repo Version
-The documented version `1.0.1-2` returns 404. Correct version as of install:
-```bash
-# Browse repo to find current version
-curl -sk https://repo.protonvpn.com/fedora-43-stable/protonvpn-stable-release/
-# Install correct version
-sudo dnf install -y https://repo.protonvpn.com/fedora-43-stable/protonvpn-stable-release/protonvpn-stable-release-1.0.3-1.noarch.rpm
-```
-
-### hcxdumptool
-Not in Fedora repos, must build from source:
-```bash
-sudo dnf install -y gcc make libpcap-devel openssl-devel
-git clone https://github.com/ZerBea/hcxdumptool.git
-cd hcxdumptool && make && sudo make install
-```
+</div>
