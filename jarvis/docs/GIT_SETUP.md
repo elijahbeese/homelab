@@ -1,4 +1,4 @@
-# Adding JARVIS to your lab-sec Repo
+# Adding JARVIS to your homelab Repo
 
 This project is set up to live on a dedicated `jarvis` branch of your existing
 homelab repo. You run these commands **once**, from your ProBook, after you've
@@ -7,8 +7,8 @@ dropped the `jarvis/` folder alongside your existing repo files.
 ## One-time branch setup
 
 ```bash
-# From your existing lab-sec repo root:
-cd ~/path/to/lab-sec
+# From your existing homelab repo root:
+cd ~/homelab
 
 # Make sure you're up to date
 git fetch origin

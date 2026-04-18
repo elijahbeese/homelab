@@ -31,7 +31,7 @@
 
 JARVIS is a personal voice assistant built from open-source parts plus the Claude API, designed to live *inside* an existing homelab rather than bolt on top of it. It's not a chatbot with a microphone — it's a voice-driven agent with scoped SSH access to every box on my Tailscale mesh, a read-only-by-default security model, and a hard monthly spend cap.
 
-Built as part of the [lab-sec](../..) cybersecurity homelab project.
+Built as part of the [homelab](../..) cybersecurity homelab project.
 
 ## Why Build It
 
@@ -146,8 +146,8 @@ The tracker logs every call to `/app/state/spend.json`. "JARVIS, what's my budge
 ### 2. Brain (ProLiant)
 ```bash
 # On the ProLiant, via Tailscale SSH:
-git clone -b jarvis git@github.com:<you>/lab-sec.git
-cd lab-sec/jarvis
+git clone -b jarvis git@github.com:elijahbeese/homelab.git
+cd homelab/jarvis
 bash deploy/install_brain.sh
 ```
 The installer creates `brain/.env`, generates an SSH key + shared secret, builds the Docker image (downloads Whisper + Piper models ~1GB), and starts the container.
@@ -161,7 +161,7 @@ This creates the `jarvis` user, installs the key, and writes the restricted sudo
 
 ### 4. Frontend (ProBook)
 ```bash
-cd lab-sec/jarvis/frontend
+cd homelab/jarvis/frontend
 bash install.sh
 # Edit .env — paste the shared secret from the brain install output
 systemctl --user enable --now jarvis-frontend
@@ -270,7 +270,7 @@ jarvis/
 
 <div align="center">
 
-**Part of the [lab-sec](../..) homelab project** · **B.S. Cybersecurity (in progress)**
+**Part of the [homelab](../..) homelab project** · **B.S. Cybersecurity (in progress)**
 
 *Building an assistant is easier than building trust in one. This repo is the paper trail for both.*
 
