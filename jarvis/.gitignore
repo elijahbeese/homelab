@@ -1,0 +1,35 @@
+# Secrets — NEVER commit
+.env
+brain/.env
+frontend/.env
+brain/ssh_keys/
+**/id_ed25519
+**/id_ed25519.pub
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Docker
+brain/state/
+brain/voices/*.onnx
+brain/voices/*.onnx.json
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log

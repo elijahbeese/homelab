@@ -1,0 +1,39 @@
+services:
+  jarvis-brain:
+    build: .
+    container_name: jarvis-brain
+    restart: unless-stopped
+
+    # Bind to Tailscale IP so only mesh devices can reach it.
+    # Replace 100.119.210.126 with your ProLiant Tailscale IP if different.
+    ports:
+      - "100.119.210.126:8765:8765"
+
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - JARVIS_CONFIG=/app/config/jarvis.yaml
+      - PYTHONUNBUFFERED=1
+
+    volumes:
+      # Mount SSH keys read-only so the brain can reach other lab hosts
+      - ./config:/app/config:ro
+      - ./ssh_keys:/home/jarvis/.ssh:ro
+      # Persistent spend log so restarts don't reset the guardrail
+      - jarvis-state:/app/state
+
+    # Log rotation so this doesn't eat the ProLiant's disk
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost',8765)); s.close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  jarvis-state:

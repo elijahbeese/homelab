@@ -1,0 +1,128 @@
+# JARVIS Brain Configuration
+# Live config — edit, then `docker compose restart jarvis-brain`
+
+# ── Models ──────────────────────────────────────────────────────────────
+models:
+  # Cheap model for conversational turns (greetings, banter, quick Q&A)
+  default: claude-haiku-4-5-20251001
+
+  # Smart model for agent work (tool use, multi-step reasoning, SSH decisions)
+  agent: claude-sonnet-4-6
+
+  # When the user says something ambiguous, we let Haiku route.
+  # If the intent requires tools or multi-step thinking, Haiku escalates to Sonnet.
+  router: claude-haiku-4-5-20251001
+
+# ── Spend guardrail ─────────────────────────────────────────────────────
+# Hard caps. When hit, the brain refuses new LLM calls until the window resets.
+budget:
+  daily_usd_limit: 0.75     # ~$22/mo absolute ceiling
+  monthly_usd_limit: 15.00  # your stated cap
+  web_search_daily_limit: 20  # $10/1000 searches → max $0.20/day
+
+# ── Voice ───────────────────────────────────────────────────────────────
+voice:
+  stt:
+    model: small.en          # tiny.en for speed, small.en for accuracy, medium.en if you ever add GPU
+    device: cpu
+    compute_type: int8       # int8 is the fastest CPU-friendly option
+    beam_size: 5
+  tts:
+    voice: en_US-amy-medium
+    # Speaking rate: 1.0 = normal, <1.0 slower, >1.0 faster
+    length_scale: 1.0
+
+# ── Assistant persona ───────────────────────────────────────────────────
+persona:
+  name: JARVIS
+  # System prompt. Edit freely. Keep it tight — system prompts burn tokens every turn.
+  system_prompt: |
+    You are JARVIS, Elijah's personal homelab assistant running on his HP ProLiant
+    in Iowa. You have tools to SSH into his lab boxes, check Docker containers,
+    query Splunk, launch apps on his Fedora ProBook, and search the web.
+
+    You speak to Elijah through voice, so keep responses SHORT and conversational
+    unless he explicitly asks for detail. No markdown, no bullet lists in spoken
+    output — it sounds weird read aloud. Numbers, times, and acronyms should be
+    written out phonetically when they'd be ambiguous.
+
+    When you use a tool that modifies state (writes files, runs shell commands,
+    restarts services), state what you're about to do in one sentence and wait
+    for confirmation. Read-only tools (status checks, searches, queries) don't
+    need confirmation.
+
+    Elijah is a cybersecurity student building a SOC lab. He knows his stuff.
+    Don't over-explain. If he asks a vague question, ask one clarifying question
+    — don't guess and act.
+
+# ── Tool permissions ────────────────────────────────────────────────────
+# "safe"  → execute without asking
+# "confirm" → speak the action, wait for "yes" / "do it" / "go"
+# "deny"  → refuse entirely (useful for temporarily disabling a tool)
+tool_policy:
+  web_search: safe
+  list_files: safe
+  read_file: safe
+  ssh_run_readonly: safe       # whitelisted read-only commands only
+  ssh_run_command: confirm     # any other SSH command
+  docker_ps: safe
+  docker_logs: safe
+  docker_restart: confirm
+  launch_app: confirm          # on the Fedora frontend
+  write_file: confirm
+  home_assistant_query: safe
+  home_assistant_action: confirm
+
+# ── SSH targets ─────────────────────────────────────────────────────────
+# The `jarvis` user on each host must exist and have the public key from
+# deploy/generate_ssh_key.sh in its authorized_keys.
+ssh_targets:
+  proxmox:
+    host: 100.90.195.73
+    user: jarvis
+    description: "OptiPlex Proxmox hypervisor (apartment)"
+  kali:
+    host: 100.77.251.92
+    user: jarvis
+    description: "Kali attack VM"
+  splunk:
+    host: 100.81.37.2
+    user: jarvis
+    description: "Splunk Enterprise VM"
+  pi:
+    host: 100.119.34.79
+    user: jarvis
+    description: "Raspberry Pi 5 — Pi-hole + Zeek"
+  proliant:
+    host: 100.119.210.126
+    user: jarvis
+    description: "HP ProLiant DL360 G7 (Iowa) — hosts JARVIS itself"
+
+# Whitelist of read-only commands that can run via ssh_run_readonly without confirm.
+# Anything not on this list routes through ssh_run_command (which requires confirm).
+ssh_readonly_commands:
+  - "uptime"
+  - "whoami"
+  - "hostname"
+  - "free -h"
+  - "df -h"
+  - "docker ps"
+  - "docker ps -a"
+  - "systemctl status"        # prefix match
+  - "systemctl is-active"     # prefix match
+  - "ps aux"
+  - "journalctl -n 50"        # prefix match
+  - "cat /proc/loadavg"
+  - "ip a"
+  - "ss -tlnp"
+
+# ── Home Assistant (optional, fill in when ready) ──────────────────────
+home_assistant:
+  enabled: false
+  url: "http://homeassistant.local:8123"
+  token: ""   # long-lived access token, DO NOT commit this
+
+# ── Frontend auth ───────────────────────────────────────────────────────
+# Shared secret the frontend sends on connect. Change this. Don't commit.
+frontend:
+  shared_secret_env: JARVIS_FRONTEND_SECRET
