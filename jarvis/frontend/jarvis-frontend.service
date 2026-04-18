@@ -1,0 +1,18 @@
+[Unit]
+Description=JARVIS voice frontend
+After=network-online.target sound.target pipewire.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/jarvis/frontend
+EnvironmentFile=%h/jarvis/frontend/.env
+ExecStart=%h/jarvis/frontend/.venv/bin/python %h/jarvis/frontend/client.py
+Restart=on-failure
+RestartSec=5
+
+# Audio needs access to the user's session
+Environment=PULSE_RUNTIME_PATH=%t/pulse
+
+[Install]
+WantedBy=default.target
