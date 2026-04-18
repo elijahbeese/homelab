@@ -23,7 +23,7 @@ budget:
 # ── Voice ───────────────────────────────────────────────────────────────
 voice:
   stt:
-    model: small.en          # tiny.en for speed, small.en for accuracy, medium.en if you ever add GPU
+    model_name: small.en          # tiny.en for speed, small.en for accuracy, medium.en if you ever add GPU
     device: cpu
     compute_type: int8       # int8 is the fastest CPU-friendly option
     beam_size: 5

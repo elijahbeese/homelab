@@ -7,7 +7,7 @@ services:
     # Bind to Tailscale IP so only mesh devices can reach it.
     # Replace 100.119.210.126 with your ProLiant Tailscale IP if different.
     ports:
-      - "100.119.210.126:8765:8765"
+      - "100.91.20.29:8765:8765"
 
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -28,12 +28,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-    healthcheck:
-      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost',8765)); s.close()"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
 
 volumes:
   jarvis-state:
